@@ -7,9 +7,7 @@ import { api, type AdminTransactionRow, type PaymentStatus } from '@/lib/api'
 import { formatStroops } from '@/lib/money'
 import { useAuthenticatedSession } from '@/components/session-provider'
 import { formatDateTime } from '@/lib/format-date'
-
-/** Testnet today; swap for `public` when the backend points at mainnet Horizon. */
-const EXPLORER_BASE = 'https://stellar.expert/explorer/testnet/tx'
+import { getNetworkConfig } from '@/lib/config/network'
 
 const STATUS_LABEL: Record<PaymentStatus, string> = {
   detected: 'Incoming',
@@ -32,6 +30,8 @@ export default function AdminTransactionsPage() {
   const { token } = useAuthenticatedSession()
   const [rows, setRows] = useState<AdminTransactionRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const explorerBase = `${getNetworkConfig().explorerUrl}/tx`
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -87,7 +87,7 @@ export default function AdminTransactionsPage() {
               header: 'Tx hash',
               render: (row) => (
                 <a
-                  href={`${EXPLORER_BASE}/${row.tx_hash}`}
+                  href={`${explorerBase}/${row.tx_hash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-brand font-mono text-xs hover:underline"
