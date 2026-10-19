@@ -19,6 +19,7 @@ import {
 import { api, ApiError, type Balance, type FeeEstimate, type Remittance } from '@/lib/api'
 import { formatStroops, isWholeKobo, parseAmountToStroops } from '@/lib/money'
 import { useAuthenticatedSession } from '@/components/session-provider'
+import { getExplorerTxUrl } from '@/lib/utils/network'
 import { Plus } from 'lucide-react'
 
 const ASSETS = ['XLM', 'cNGN']
@@ -259,44 +260,12 @@ export default function SendPage() {
                 placeholder="GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
                 value={state.address}
                 onChange={(event) =>
-                  setState((prev) => ({
-                    ...prev,
-                    address: event.target.value.toUpperCase(),
-                    showContacts: event.target.value.length > 0 ? false : state.contacts.length > 0,
-                  }))
+                  setState((prev) => ({ ...prev, address: event.target.value.trim() }))
                 }
-                onFocus={() =>
-                  setState((prev) => ({
-                    ...prev,
-                    showContacts: prev.address.length === 0 && prev.contacts.length > 0,
-                  }))
-                }
+                autoComplete="off"
+                spellCheck={false}
               />
-              {state.showContacts && state.contacts.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-panel border border-hairline rounded-lg z-10 max-h-48 overflow-y-auto">
-                  {state.contacts.map((contact) => (
-                    <button
-                      key={contact.id}
-                      type="button"
-                      onClick={() =>
-                        setState((prev) => ({
-                          ...prev,
-                          address: contact.address,
-                          showContacts: false,
-                        }))
-                      }
-                      className="w-full text-left p-3 hover:bg-raised transition-colors border-b last:border-b-0"
-                    >
-                      <p className="font-medium text-sm">{contact.name}</p>
-                      <p className="text-dim text-xs font-mono truncate">{contact.address}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
-            {state.address && !validateAddress() && (
-              <p className="text-xs text-red-500">Invalid Stellar address</p>
-            )}
           </div>
 
           <div className="space-y-2">
@@ -314,121 +283,73 @@ export default function SendPage() {
             <Label htmlFor="memo">Memo (optional)</Label>
             <Input
               id="memo"
-              maxLength={28}
               placeholder="Add a note"
               value={state.memo}
               onChange={(event) => setState((prev) => ({ ...prev, memo: event.target.value }))}
             />
-            <p className="text-dim text-xs">{state.memo.length}/28</p>
           </div>
 
+          {state.loadingFee && (
+            <p className="text-dim text-sm">Estimating fee…</p>
+          )}
+          {state.feeError && (
+            <p className="text-dim text-sm">Could not estimate the fee. You can still send.</p>
+          )}
           {state.feeEstimate && (
-            <div className="bg-raised border-hairline rounded-lg border p-3 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-dim">Amount</span>
-                <span>
-                  {formatStroops(stroops ?? 0n)} {state.asset}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-dim">Fee</span>
-                <span>
-                  {formatStroops(state.feeEstimate.fee_stroops)} {state.asset}
-                </span>
-              </div>
-              {state.feeEstimate.network_fee_stroops > 0n && (
-                <div className="flex justify-between">
-                  <span className="text-dim">Network fee</span>
-                  <span>
-                    {formatStroops(state.feeEstimate.network_fee_stroops)} {state.asset}
-                  </span>
-                </div>
-              )}
-              <div className="border-hairline border-t pt-2 flex justify-between font-bold">
-                <span>Total</span>
-                <span>
-                  {formatStroops(totalAmount ?? 0n)} {state.asset}
-                </span>
-              </div>
+            <div className="text-dim flex justify-between text-sm">
+              <span>Fee</span>
+              <span>{formatStroops(state.feeEstimate.fee_stroops)} {state.asset}</span>
+            </div>
+          )}
+          {totalAmount !== null && totalAmount > 0n && (
+            <div className="flex justify-between text-sm font-medium">
+              <span>Total</span>
+              <span>{formatStroops(totalAmount)} {state.asset}</span>
             </div>
           )}
 
-          {state.loadingFee && stroops && stroops > 0n && (
-            <p className="text-dim text-xs flex items-center gap-2">
-              <LoadingSpinner className="size-3" />
-              Calculating fee estimate...
-            </p>
-          )}
-
-          {state.feeError && stroops && stroops > 0n && (
-            <p role="status" className="text-warning text-xs">
-              Fee estimate unavailable. You can still send; the exact fee is applied when the
-              payment is submitted.
-            </p>
-          )}
-
-          <Button
-            type="submit"
-            size="lg"
-            disabled={state.submitting || !validateAddress() || !stroops || stroops <= 0n}
-          >
-            {state.submitting ? 'Sending…' : 'Send money'}
+          <Button type="submit" disabled={state.submitting}>
+            {state.submitting ? 'Sending…' : 'Send'}
           </Button>
         </form>
 
-        {state.remittances.length > 0 && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-dim text-xs font-bold tracking-widest uppercase">Recent sends</h2>
-              <Link
-                href="/remittances"
-                className="text-brand text-xs font-semibold hover:underline"
-              >
-                View all
-              </Link>
-            </div>
-            <ul className="border-hairline divide-y">
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold tracking-tight">Recent sends</h2>
+          {state.remittances.length === 0 ? (
+            <p className="text-dim text-sm">No sends yet.</p>
+          ) : (
+            <ul className="space-y-2">
               {state.remittances.map((remittance) => (
-                <li key={remittance.id} className="space-y-1 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold tabular-nums text-white truncate">
-                        {formatStroops(remittance.amount_stroops)} {remittance.asset}
-                      </p>
-                      <p className="text-dim text-xs truncate font-mono">
-                        {remittance.destination_address}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        remittance.status === 'confirmed'
-                          ? 'default'
-                          : remittance.status === 'failed'
-                            ? 'destructive'
-                            : 'secondary'
-                      }
-                    >
+                <li
+                  key={remittance.id}
+                  className="bg-panel border-hairline flex items-center justify-between gap-3 rounded-xl border p-4"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {formatStroops(remittance.amount_stroops)} {remittance.asset}
+                    </p>
+                    <p className="text-dim truncate text-xs">{remittance.recipient_address}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={remittance.status === 'failed' ? 'destructive' : 'secondary'}>
                       {STATUS_LABEL[remittance.status]}
                     </Badge>
+                    {remittance.tx_hash && (
+                      <a
+                        href={getExplorerTxUrl(remittance.tx_hash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs underline"
+                      >
+                        Receipt
+                      </a>
+                    )}
                   </div>
-                  {remittance.tx_hash && (
-                    <a
-                      href={`https://stellar.expert/explorer/public/tx/${remittance.tx_hash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-400 hover:text-blue-300 break-all"
-                    >
-                      View on Stellar Explorer
-                    </a>
-                  )}
-                  {remittance.failure_reason && (
-                    <p className="text-dim text-xs">{remittance.failure_reason}</p>
-                  )}
                 </li>
               ))}
             </ul>
-          </section>
-        )}
+          )}
+        </section>
       </div>
     </div>
   )

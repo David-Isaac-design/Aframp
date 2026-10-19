@@ -9,8 +9,7 @@ import { api, ApiError, type Remittance } from '@/lib/api'
 import { formatStroops } from '@/lib/money'
 import { useAuthenticatedSession } from '@/components/session-provider'
 import { formatDateTime } from '@/lib/format-date'
-
-const EXPLORER_BASE = 'https://stellar.expert/explorer/public/tx'
+import { getExplorerTxUrl } from '@/lib/utils/network'
 
 const STATUS_LABEL: Record<Remittance['status'], string> = {
   pending: 'Pending',
@@ -104,7 +103,7 @@ export default function RemittancesPage() {
                         {' '}
                         ·{' '}
                         <a
-                          href={`${EXPLORER_BASE}/${remittance.tx_hash}`}
+                          href={getExplorerTxUrl(remittance.tx_hash)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="hover:text-bright underline underline-offset-2"
