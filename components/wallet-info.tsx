@@ -5,18 +5,7 @@ import { motion } from 'framer-motion'
 import { BadgeCheck, Check, Copy, ExternalLink, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-
-/**
- * Stellar explorer base URL.
- * Reads NEXT_PUBLIC_STELLAR_NETWORK at runtime so the link works for both
- * testnet development builds and mainnet production builds without any
- * code change.  Falls back to testnet when the variable is absent (local dev).
- */
-function explorerBase(): string {
-  const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'TESTNET'
-  const segment = network === 'MAINNET' ? 'public' : 'testnet'
-  return `https://stellar.expert/explorer/${segment}/account`
-}
+import { explorerAccountUrl } from '@/lib/network'
 
 export interface WalletInfoProps {
   walletName: string
@@ -102,7 +91,7 @@ export function WalletInfo({
       </div>
 
       <Button asChild variant="outline" size="sm" className="w-full">
-        <a href={`${explorerBase()}/${walletAddress}`} target="_blank" rel="noopener noreferrer">
+        <a href={explorerAccountUrl(walletAddress)} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="size-4" aria-hidden />
           View on explorer
         </a>
